@@ -1,4 +1,6 @@
-import React, {Component, PropTypes} from "react";
+import React, {Component} from "react";
+import PropTypes from "prop-types";
+import {validate as jsonValidate} from "jsonschema";
 
 import {
   getWidget,
@@ -193,7 +195,7 @@ class ArrayField extends Component {
     return formDataItems.map((item) => {
       const type = typeof item;
       const itemType = (type === "object" && Array.isArray(item)) ? "array" : type;
-      const schema = this.getAnyOfItemSchema(anyOfSchema, itemType);
+      const schema = this.getAnyOfItemSchema(anyOfSchema, itemType, item);
 
       // If this schema is an array, we need to recursively add its contents
       if (schema.type === "array") {
@@ -204,8 +206,13 @@ class ArrayField extends Component {
     });
   }
 
-  getAnyOfItemSchema(anyOfSchema, type) {
+  getAnyOfItemSchema(anyOfSchema, type, item) {
     return anyOfSchema.find((schemaElement) => {
+      if ("$ref" in schemaElement) {
+        const refSchema = retrieveSchema(schemaElement, this.props.registry.definitions);
+        const {errors} = jsonValidate(item, refSchema);
+        return errors.length === 0;
+      }
       const schemaElementType = schemaElement.type === "integer" ? "number" : schemaElement.type;
       return schemaElementType === type;
     });
