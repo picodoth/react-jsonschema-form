@@ -18,6 +18,35 @@ import {
   setState
 } from "../../utils";
 
+function resolveSchemaRecursively(schema, definitions) {
+  let unwrappedSchema = schema;
+  if (schema.$ref) {
+    unwrappedSchema = retrieveSchema(schema, definitions);
+  }
+
+  if (unwrappedSchema.properties) {
+    Object.keys(unwrappedSchema.properties).forEach(p => {
+      const prop = unwrappedSchema.properties[p];
+      if (prop.type === "array") {
+        if (prop.items.anyOf) {
+          prop.items.anyOf.forEach((ele, index) => {
+            prop.items.anyOf[index] = resolveSchemaRecursively(prop.items[index], definitions);
+          });
+        } else if (prop.items.$ref) {
+          prop.items = resolveSchemaRecursively(prop.items, definitions);
+        } else {
+          // 什么也不做
+        }
+
+      } else {
+        unwrappedSchema.properties[p] = resolveSchemaRecursively(prop, definitions);
+      }
+    });
+  }
+
+  return unwrappedSchema;
+}
+
 function ArrayFieldTitle({TitleField, idSchema, title, required}) {
   if (!title) {
     // See #312: Ensure compatibility with old versions of React.
@@ -209,7 +238,8 @@ class ArrayField extends Component {
   getAnyOfItemSchema(anyOfSchema, type, item) {
     return anyOfSchema.find((schemaElement) => {
       if ("$ref" in schemaElement) {
-        const refSchema = retrieveSchema(schemaElement, this.props.registry.definitions);
+        const refSchema = resolveSchemaRecursively(schemaElement, this.props.registry.definitions);
+        debugger;
         const {errors} = jsonValidate(item, refSchema);
         return errors.length === 0;
       }
