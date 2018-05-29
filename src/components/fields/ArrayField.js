@@ -326,7 +326,7 @@ class ArrayField extends Component {
   };
 
   anyOfOptions(anyOfItems) {
-    return anyOfItems.map(item => ({value: item.type, label: item.type}));
+    return anyOfItems.map(item => ({value: item.type, label: item.title}));
   }
 
   setWidgetType(index, value) {
@@ -335,7 +335,7 @@ class ArrayField extends Component {
     const {definitions} = registry;
     const anyOfItemsSchema = this.getAnyOfItemsSchema();
     const newItems = items.slice();
-    const foundItem = anyOfItemsSchema.find((element) => element.type === value);
+    const foundItem = anyOfItemsSchema.find((element) => element.type === value || element.title === value);
     newItems[index] = getDefaultFormState(foundItem, undefined, definitions);
 
     const newAnyOfItems = [...this.state.anyOfItems];
