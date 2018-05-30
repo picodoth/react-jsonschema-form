@@ -469,16 +469,16 @@ class ArrayField extends Component {
     const { ArrayFieldTemplate, definitions, fields, formContext } = registry;
     const { TitleField, DescriptionField } = fields;
     const anyOfItems = this.getAnyOfItemsFromProps();
-    let itemsSchema = retrieveSchema(schema.items || schema.items.anyOf, definitions);
+    const itemsSchema = retrieveSchema(schema.items || schema.items.anyOf, definitions);
     const anyOfItemsSchema = this.getAnyOfItemsSchema();
     const arrayProps = {
       canAdd: this.canAddItem(formData),
       items: formData.map((item, index) => {
-        const itemSchema = retrieveSchema(schema.items, definitions, item);
+        let itemSchema = retrieveSchema(schema.items, definitions, item);
         const itemErrorSchema = errorSchema ? errorSchema[index] : undefined;
         const itemIdPrefix = idSchema.$id + "_" + index;
         if (anyOfItemsSchema) {
-          itemsSchema = anyOfItems[index];
+          itemSchema = anyOfItems[index];
         }
         const itemIdSchema = toIdSchema(
           itemSchema,
@@ -749,6 +749,7 @@ class ArrayField extends Component {
       </div>
     ) : null;
 
+    console.log('Render SchemaField in ArrayField');
     return {
       children: (
         <SchemaField

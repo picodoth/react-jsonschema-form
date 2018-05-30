@@ -108,6 +108,8 @@ class ObjectField extends Component {
       TitleField,
       DescriptionField,
       properties: orderedProperties.map(name => {
+
+        console.log('Render SchemaField in ObjectField');
         return {
           content: (
             <SchemaField
