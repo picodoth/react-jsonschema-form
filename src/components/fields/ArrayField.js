@@ -1,5 +1,6 @@
 import React, { Component } from "react";
 import PropTypes from "prop-types";
+import { validate as jsonValidate } from "jsonschema";
 
 import UnsupportedField from "./UnsupportedField";
 import {
@@ -15,6 +16,35 @@ import {
   toIdSchema,
   getDefaultRegistry,
 } from "../../utils";
+
+function resolveSchemaRecursively(schema, definitions) {
+  let unwrappedSchema = schema;
+  if (schema.$ref) {
+    unwrappedSchema = retrieveSchema(schema, definitions);
+  }
+
+  if (unwrappedSchema.properties) {
+    Object.keys(unwrappedSchema.properties).forEach(p => {
+      const prop = unwrappedSchema.properties[p];
+      if (prop.type === "array") {
+        if (prop.items.anyOf) {
+          prop.items.anyOf.forEach((ele, index) => {
+            prop.items.anyOf[index] = resolveSchemaRecursively(prop.items[index], definitions);
+          });
+        } else if (prop.items.$ref) {
+          prop.items = resolveSchemaRecursively(prop.items, definitions);
+        } else {
+          // 什么也不做
+        }
+
+      } else {
+        unwrappedSchema.properties[p] = resolveSchemaRecursively(prop, definitions);
+      }
+    });
+  }
+
+  return unwrappedSchema;
+}
 
 function ArrayFieldTitle({ TitleField, idSchema, title, required }) {
   if (!title) {
@@ -57,6 +87,7 @@ function DefaultArrayItem(props) {
   return (
     <div key={props.index} className={props.className}>
       <div className={props.hasToolbar ? "col-xs-9" : "col-xs-12"}>
+        {props.selectWidget}
         {props.children}
       </div>
 
@@ -199,6 +230,45 @@ class ArrayField extends Component {
     return schema.items.title || schema.items.description || "Item";
   }
 
+  getAnyOfItemsFromProps() {
+    const anyOfSchema = this.props.schema.anyOf;
+    const formDataItems = this.props.formData;
+
+    if (this.getAnyOfItemsSchema() && formDataItems.map) {
+      return formDataItems.map((item) => {
+        const type = typeof item;
+        const itemType = (type === "object" && Array.isArray(item)) ? "array" : type;
+        const schema = this.getAnyOfItemSchema(anyOfSchema, itemType, item);
+
+        // FIXME If this schema is an array, we need to recursively add its contents
+        // if (schema.type === "array") {
+        //   this.getAnyOfItemsFromProps(item, schema.items.anyOf);
+        // }
+
+        return schema;
+      });
+    }
+
+    return [];
+  }
+
+  getAnyOfItemSchema(anyOfSchema, type, item) {
+    return anyOfSchema.find((schemaElement) => {
+      if ("$ref" in schemaElement) {
+        const refSchema = resolveSchemaRecursively(schemaElement, this.props.registry.definitions);
+        const {errors} = jsonValidate(item, refSchema);
+        return errors.length === 0;
+      }
+      const schemaElementType = schemaElement.type === "integer" ? "number" : schemaElement.type;
+      return schemaElementType === type;
+    });
+  }
+
+  getAnyOfItemsSchema() {
+    const { schema } = this.props;
+    return schema.anyOf;
+  }
+
   isItemRequired(itemSchema) {
     if (Array.isArray(itemSchema.type)) {
       // While we don't yet support composite/nullable jsonschema types, it's
@@ -324,6 +394,30 @@ class ArrayField extends Component {
     this.props.onChange(value);
   };
 
+  anyOfOptions(anyOfItems) {
+    return anyOfItems.map(item => ({ value: item.type, label: item.title }));
+  }
+
+  setWidgetType(index, value) {
+    /* FIXME
+    const { items } = this.props.formData;
+    const { registry } = this.props;
+    const { definitions } = registry;
+    const anyOfItemsSchema = this.getAnyOfItemsSchema();
+    const newItems = items.slice();
+    const foundItem = anyOfItemsSchema.find((element) => element.type === value);
+    newItems[index] = getDefaultFormState(foundItem, undefined, definitions);
+
+    const newAnyOfItems = [...this.state.anyOfItems];
+    newAnyOfItems[index] = foundItem;
+
+    const newState = Object.assign({}, this.state,
+      {formData: {items: newItems}, anyOfItems: newAnyOfItems});
+
+    this.asyncSetState(newState);
+    */
+  }
+
   render() {
     const {
       schema,
@@ -332,7 +426,7 @@ class ArrayField extends Component {
       registry = getDefaultRegistry(),
     } = this.props;
     const { definitions } = registry;
-    if (!schema.hasOwnProperty("items")) {
+    if (!schema.hasOwnProperty("items") && !schema.hasOwnProperty("anyOf")) {
       return (
         <UnsupportedField
           schema={schema}
@@ -374,13 +468,18 @@ class ArrayField extends Component {
     const title = schema.title === undefined ? name : schema.title;
     const { ArrayFieldTemplate, definitions, fields, formContext } = registry;
     const { TitleField, DescriptionField } = fields;
-    const itemsSchema = retrieveSchema(schema.items, definitions);
+    const anyOfItems = this.getAnyOfItemsFromProps();
+    let itemsSchema = retrieveSchema(schema.items || schema.anyOf, definitions);
+    const anyOfItemsSchema = this.getAnyOfItemsSchema();
     const arrayProps = {
       canAdd: this.canAddItem(formData),
       items: formData.map((item, index) => {
         const itemSchema = retrieveSchema(schema.items, definitions, item);
         const itemErrorSchema = errorSchema ? errorSchema[index] : undefined;
         const itemIdPrefix = idSchema.$id + "_" + index;
+        if (anyOfItemsSchema) {
+          itemsSchema = anyOfItems[index];
+        }
         const itemIdSchema = toIdSchema(
           itemSchema,
           itemIdPrefix,
@@ -400,6 +499,8 @@ class ArrayField extends Component {
           autofocus: autofocus && index === 0,
           onBlur,
           onFocus,
+          anyOfItemsSchema: anyOfItemsSchema,
+          selectWidgetValue: anyOfItems.length > 0 ? anyOfItems[index].type : "",
         });
       }),
       className: `field field-array field-array-of-${itemsSchema.type}`,
@@ -551,7 +652,7 @@ class ArrayField extends Component {
         const itemSchema = additional
           ? retrieveSchema(schema.additionalItems, definitions, item)
           : itemSchemas[index];
-        const itemIdPrefix = idSchema.$id + "_" + index;
+          const itemIdPrefix = idSchema.$id + "_" + index;
         const itemIdSchema = toIdSchema(
           itemSchema,
           itemIdPrefix,
@@ -612,6 +713,8 @@ class ArrayField extends Component {
       onBlur,
       onFocus,
       rawErrors,
+      anyOfItemsSchema,
+      selectWidgetValue
     } = props;
     const {
       disabled,
@@ -621,6 +724,7 @@ class ArrayField extends Component {
     } = this.props;
     const {
       fields: { SchemaField },
+      widgets: { SelectWidget },
     } = registry;
     const { orderable, removable } = {
       orderable: true,
@@ -633,6 +737,17 @@ class ArrayField extends Component {
       remove: removable && canRemove,
     };
     has.toolbar = Object.keys(has).some(key => has[key]);
+
+    const selectWidget = anyOfItemsSchema ? (
+      <div className="form-group" style={{width: 120}}>
+        <SelectWidget
+          schema={{type: "integer", default: selectWidgetValue}}
+          id="select-widget-id"
+          options={{enumOptions: this.anyOfOptions(anyOfItemsSchema)}}
+          value={selectWidgetValue}
+          onChange={(value) => this.setWidgetType(index, value)}/>
+      </div>
+    ) : null;
 
     return {
       children: (
@@ -653,6 +768,7 @@ class ArrayField extends Component {
           rawErrors={rawErrors}
         />
       ),
+      selectWidget: selectWidget,
       className: "array-item",
       disabled,
       hasToolbar: has.toolbar,
@@ -663,6 +779,8 @@ class ArrayField extends Component {
       onDropIndexClick: this.onDropIndexClick,
       onReorderClick: this.onReorderClick,
       readonly,
+      anyOfItemsSchema,
+      selectWidgetValue,
     };
   }
 }
