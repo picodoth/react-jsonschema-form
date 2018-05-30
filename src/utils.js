@@ -66,9 +66,9 @@ export function getSchemaType(schema) {
   let { type } = schema;
   if (!type && schema.enum) {
     type = "string";
-  } else if (!type && schema.anyOf) {
+  }/* else if (!type && schema.anyOf) {
     type = "array";
-  }
+  }*/
   return type;
 }
 

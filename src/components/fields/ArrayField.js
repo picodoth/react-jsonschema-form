@@ -426,7 +426,7 @@ class ArrayField extends Component {
       registry = getDefaultRegistry(),
     } = this.props;
     const { definitions } = registry;
-    if (!schema.hasOwnProperty("items") && !schema.hasOwnProperty("anyOf")) {
+    if (!schema.hasOwnProperty("items")/* && !schema.hasOwnProperty("anyOf")*/) {
       return (
         <UnsupportedField
           schema={schema}
