@@ -231,7 +231,7 @@ class ArrayField extends Component {
   }
 
   getAnyOfItemsFromProps() {
-    const anyOfSchema = this.props.schema.anyOf;
+    const anyOfSchema = this.props.schema.items.anyOf;
     const formDataItems = this.props.formData;
 
     if (this.getAnyOfItemsSchema() && formDataItems.map) {
@@ -266,7 +266,7 @@ class ArrayField extends Component {
 
   getAnyOfItemsSchema() {
     const { schema } = this.props;
-    return schema.anyOf;
+    return schema.items.anyOf;
   }
 
   isItemRequired(itemSchema) {
@@ -469,7 +469,7 @@ class ArrayField extends Component {
     const { ArrayFieldTemplate, definitions, fields, formContext } = registry;
     const { TitleField, DescriptionField } = fields;
     const anyOfItems = this.getAnyOfItemsFromProps();
-    let itemsSchema = retrieveSchema(schema.items || schema.anyOf, definitions);
+    let itemsSchema = retrieveSchema(schema.items || schema.items.anyOf, definitions);
     const anyOfItemsSchema = this.getAnyOfItemsSchema();
     const arrayProps = {
       canAdd: this.canAddItem(formData),
