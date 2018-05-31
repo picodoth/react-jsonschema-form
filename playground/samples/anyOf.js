@@ -9,11 +9,13 @@ module.exports = {
           "anyOf": [
             {
               "title": "string",
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             {
               "title": "integer",
-              "type": "integer"
+              "type": "integer",
+              "default": 0
             },
             {
               "title": "array",
@@ -22,14 +24,17 @@ module.exports = {
                 "anyOf": [
                   {
                     "title": "string",
-                    "type": "string"
+                    "type": "string",
+                    "default": ""
                   },
                   {
                     "title": "integer",
-                    "type": "integer"
+                    "type": "integer",
+                    "default": 0
                   }
                 ]
-              }
+              },
+              "default": [""],
             }
           ]
         }

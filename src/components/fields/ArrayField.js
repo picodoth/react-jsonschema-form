@@ -302,9 +302,14 @@ class ArrayField extends Component {
     if (isFixedItems(schema) && allowAdditionalItems(schema)) {
       itemSchema = schema.additionalItems;
     }
+    if (itemSchema.anyOf) {
+      // use the first type if it's an anyOf
+      itemSchema = itemSchema.anyOf[0];
+    }
+    const newItem = getDefaultFormState(itemSchema, undefined, definitions);
     this.props.onChange([
       ...formData,
-      getDefaultFormState(itemSchema, undefined, definitions),
+      newItem,
     ]);
   };
 
@@ -399,14 +404,14 @@ class ArrayField extends Component {
   }
 
   setWidgetType(index, value) {
-    /* FIXME
-    const { items } = this.props.formData;
-    const { registry } = this.props;
-    const { definitions } = registry;
+    const { formData, registry: { definitions } } = this.props;
     const anyOfItemsSchema = this.getAnyOfItemsSchema();
-    const newItems = items.slice();
+    const newItems = formData.slice();
     const foundItem = anyOfItemsSchema.find((element) => element.type === value);
     newItems[index] = getDefaultFormState(foundItem, undefined, definitions);
+    console.log({ formData, foundItem, definitions, newItem: newItems[index]});
+    this.props.onChange(newItems);
+    /* FIXME
 
     const newAnyOfItems = [...this.state.anyOfItems];
     newAnyOfItems[index] = foundItem;
